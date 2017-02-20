@@ -1,0 +1,241 @@
+<?php namespace ProcessWire;
+
+/**
+* Feedback
+*
+* See README.md for usage instructions.
+*
+* @author Tabea David <info@justonestep.de>
+* @version 0.0.1
+* @copyright Copyright (c) 2017
+* @see https://github.com/justonestep/processwire-feedback
+* @see http://www.processwire.com
+*/
+
+/**
+* Class Feedback
+*/
+class Feedback extends WireData implements Module {
+
+  /**
+   * Get module information
+   *
+   * @return array
+   */
+  public static function getModuleInfo() {
+    return array(
+      'title' => 'Feedback',
+      'summary' => 'Save feedack received via json and display it (backend).',
+      'version' => 001,
+      'href' => 'https://github.com/justonestep/processwire-feedback',
+      'singular' => true,
+      'autoload' => true,
+      'icon' => 'envelope',
+    );
+  }
+
+  /**
+   * string template name
+   */
+  const TEMPLATE_NAME = 'feedback';
+
+  /**
+   * string tag name
+   */
+  const TAG_NAME = 'feedback';
+
+  /**
+   * Initialize the module - ready
+   *
+   * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
+   * when ProcessWire's API is ready. As a result, this is a good place to attach hooks.
+   */
+  public function ready() {
+    $this->addHookBefore('Modules::saveModuleConfigData', $this, 'addFields');
+  }
+
+  public function saveFeedback() {
+    // @todo: error handling
+    // @todo: add token validation
+    // @todo: save data
+
+    // only accept post requests
+    if (strtolower($_SERVER['REQUEST_METHOD']) !== 'post') return $this->setErrorResponse(3);
+
+    // only accept content type "application/json"
+    if (strtolower($_SERVER['CONTENT_TYPE']) !== 'application/json') return $this->setErrorResponse(2);
+
+    if ($json = json_decode(@file_get_contents('php://input'), true)) {
+      $feedback = array_merge($_REQUEST, $json);
+    }
+
+    if (!isset($feedback)) return $this->setErrorResponse(1);
+
+    // build form
+    $form = $this->modules->get('InputfieldForm');
+    $form->method = 'post';
+
+    // add fields, set field values
+    foreach ($this->allFields as $in) {
+      $key = str_replace(self::TAG_NAME . '_', '', $in);
+      $field = $this->fields->get($in);
+      $inputfield = $field->getInputfield($this->page);
+      $form->append($inputfield);
+      if (isset($feedback[$key])) $this->input->post[$in] = $feedback[$key];
+    }
+
+    // add CSRF token
+    $this->input->post[$this->session->CSRF->getTokenName()] = $this->session->CSRF->getTokenValue();
+
+    // process input, send and validate form
+    $form->processInput($this->input->post);
+
+    // evaluate form
+    if ($form->getErrors()) {
+      $errors = array();
+      foreach ($form->children as $in) {
+        if ($err = $in->getErrors()) {
+          $key = str_replace(self::TAG_NAME . '_', '', $in->name);
+          $errors[$key] = $err[0];
+        }
+      }
+
+      return $this->setErrorResponse(999, $errors);
+    } else {
+      $data = array(
+        'success' => true
+      );
+    }
+
+    return json_encode($data);
+  }
+
+  private function setErrorResponse($reason, $errors = array()) {
+    http_response_code(400);
+
+    switch ($reason) {
+      case 1:
+        $msg = 'Empty data.';
+        break;
+      case 2:
+        $msg = 'Wrong content type.';
+        break;
+      case 3:
+        $msg = 'Wrong request method.';
+        break;
+    }
+
+    $data = array('success' => false);
+    if ($errors) $data['errors'] = $errors;
+
+    return json_encode($data);
+  }
+
+  /**
+   * Hook create and add template fields
+   *
+   * @param HookEvent $event
+   */
+  public function addFields(HookEvent $event) {
+    if ($event->arguments[0] !== $this->className) return;
+
+    $configData = $event->arguments[1];
+
+    // create template if it doesn't exist
+    $fg = $this->createTemplate($configData);
+
+    // get fields
+    if ($configData['addFields']) {
+      $this->addNewFields($configData, $fg);
+      $event->setArgument(1, $configData);
+    }
+  }
+
+  /**
+   * Create template
+   *
+   * @param array $configData
+   * @return Fieldgroup
+   */
+  private function createTemplate($configData) {
+    if ($template = $this->templates->get(self::TEMPLATE_NAME)) {
+      $fg = $template->fieldgroup; // get existing fieldgroup
+    } else {
+      // new fieldgroup
+      $fg = new Fieldgroup();
+      $fg->name = self::TEMPLATE_NAME;
+      $fg->add($this->fields->get('title')); // needed title field
+      $fg->save();
+
+      // new template
+      $template = new Template();
+      $template->name = self::TEMPLATE_NAME;
+      $template->fieldgroup = $fg; // add the fieldgroup
+      $template->slashUrls = 1;
+      $template->noPrependTemplateFile = 1;
+      $template->noAppendTemplateFile = 1;
+      $template->tags = self::TAG_NAME;
+      $template->save();
+    }
+
+    $this->validateParent($configData);
+
+    return $fg;
+  }
+
+  /**
+   * Validate parent page
+   *
+   * @param array $configData
+   */
+  private function validateParent($configData) {
+    // add default for save messages parent
+    if (!$configData['saveMessagesParent']) $configData['saveMessagesParent'] = $this->config->rootPageID;
+    // check if selected parent allows children
+    $pTemplate = $this->pages->get($configData['saveMessagesParent'])->template;
+    // noChildren must be 0
+    if ($pTemplate->noChildren > 0) {
+      $this->log->error($this->_('Please choose another parent or change the belonging template. It must allow children.'));
+    } elseif (count($pTemplate->childTemplates) > 0 && !in_array($configData['saveMessagesParent'], $pTemplate->childTemplates)) {
+      // if childTemplates is set, it must contain parent->template->id
+      $this->log->error(sprintf(
+        $this->_("Please choose another parent or change the belonging template. AllowedTemplates must include `%s` template."),
+        self::TEMPLATE_NAME
+      ));
+    }
+  }
+
+  /**
+   * Add new fields
+   *
+   * @param array $configData
+   * @param Fieldgroup $fg
+   */
+  private function addNewFields(&$configData, $fg) {
+    $newFields = $configData['addFields'];
+    $allFields = $configData['allFields'];
+
+    foreach (explode(',', $newFields) as $name) {
+      $taggedName = self::TAG_NAME . '_' . $name;
+      if (!in_array($taggedName, $allFields)) $allFields[] = $taggedName;
+      if (!is_null($this->fields->get($taggedName))) continue;
+
+      $f = new Field();
+      $f->type = $this->modules->get('FieldtypeText');
+      $f->name = $taggedName;
+      $f->label = ucfirst($name);
+      $f->tags = self::TAG_NAME;
+      $f->columnWidth = '25';
+      $f->save();
+
+      if ($fg) {
+        $fg->add($f); // add field to fieldgroup
+        $fg->save(); // save fieldgroup
+      }
+    }
+
+    $configData['allFields'] = $allFields;
+    $configData['addFields'] = '';
+  }
+
+}
