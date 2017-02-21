@@ -6,7 +6,7 @@
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.0.1
+* @version 0.0.2
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -26,7 +26,7 @@ class Feedback extends WireData implements Module {
     return array(
       'title' => 'Feedback',
       'summary' => 'Save feedack received via json and display it (backend).',
-      'version' => 001,
+      'version' => 002,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -54,24 +54,75 @@ class Feedback extends WireData implements Module {
     $this->addHookBefore('Modules::saveModuleConfigData', $this, 'addFields');
   }
 
+  /**
+   *
+   */
   public function saveFeedback() {
-    // @todo: error handling
-    // @todo: add token validation
-    // @todo: save data
-
     // only accept post requests
-    if (strtolower($_SERVER['REQUEST_METHOD']) !== 'post') return $this->setErrorResponse(3);
+    if (strtolower($_SERVER['REQUEST_METHOD']) !== 'post') return $this->setErrorResponse(1);
 
     // only accept content type "application/json"
     if (strtolower($_SERVER['CONTENT_TYPE']) !== 'application/json') return $this->setErrorResponse(2);
 
-    if ($json = json_decode(@file_get_contents('php://input'), true)) {
-      $feedback = array_merge($_REQUEST, $json);
-    }
+    // get passed parameters
+    $params = $this->getPassedParams();
 
-    if (!isset($feedback)) return $this->setErrorResponse(1);
+    // handle empty response
+    if (!$params) return $this->setErrorResponse(3);
+
+    // validate authentication
+    if (!$this->isValidAuthentification($params)) return $this->setErrorResponse(4, 401);
 
     // build form
+    $form = $this->buildAndProcessForm($params);
+
+    // evaluate form
+    if ($form->getErrors()) return $this->getErrorsAndSetResponse($form);
+
+    // save feedback
+    $success = $this->createFeedback($params);
+    if (!$success) return $this->setErrorResponse(5);
+
+    return $this->setSuccessResponse();
+  }
+
+  /**
+   *
+   */
+  private function getPassedParams() {
+    $params = null;
+
+    if ($json = json_decode(@file_get_contents('php://input'), true)) {
+      $params = array_merge($_REQUEST, $json);
+
+      // basic HTTP authetication
+      if (isset($_SERVER['PHP_AUTH_USER'])) {
+        $credentials = array(
+          'fname' => $_SERVER['PHP_AUTH_USER'],
+          'fpass' => $_SERVER['PHP_AUTH_PW']
+        );
+
+        $params = array_merge($params, $credentials);
+      }
+    }
+
+    return $params;
+  }
+
+  /**
+   *
+   */
+  private function isValidAuthentification($params) {
+    $isCorrectUser = isset($params['fname']) && $params['fname'] === $this->apiUser;
+    $isCorrectPass = isset($params['fpass']) && $params['fpass'] === $this->apiKey;
+
+    return $isCorrectUser && $isCorrectPass;
+  }
+
+  /**
+   *
+   */
+  private function buildAndProcessForm($params) {
     $form = $this->modules->get('InputfieldForm');
     $form->method = 'post';
 
@@ -81,7 +132,7 @@ class Feedback extends WireData implements Module {
       $field = $this->fields->get($in);
       $inputfield = $field->getInputfield($this->page);
       $form->append($inputfield);
-      if (isset($feedback[$key])) $this->input->post[$in] = $feedback[$key];
+      if (isset($params[$key])) $this->input->post[$in] = $params[$key];
     }
 
     // add CSRF token
@@ -90,42 +141,96 @@ class Feedback extends WireData implements Module {
     // process input, send and validate form
     $form->processInput($this->input->post);
 
-    // evaluate form
-    if ($form->getErrors()) {
-      $errors = array();
-      foreach ($form->children as $in) {
-        if ($err = $in->getErrors()) {
-          $key = str_replace(self::TAG_NAME . '_', '', $in->name);
-          $errors[$key] = $err[0];
-        }
-      }
-
-      return $this->setErrorResponse(999, $errors);
-    } else {
-      $data = array(
-        'success' => true
-      );
-    }
-
-    return json_encode($data);
+    return $form;
   }
 
-  private function setErrorResponse($reason, $errors = array()) {
-    http_response_code(400);
+  // create the new page
+  /**
+   *
+   */
+  private function createFeedback($params) {
+    $date = new \DateTime();
+    $name = array($date->getTimestamp());
+
+    if ($parts = $this->saveMessagesScheme) {
+      foreach ($parts as $part) {
+        $key = str_replace(self::TAG_NAME . '_', '', $part);
+        if (isset($params[$key])) $name[] = $params[$key];
+      }
+    }
+
+    if (count($name) > 1) unset($name[0]);
+    $pageName = implode(' ', $name);
+
+    $p = new Page();
+    $p->template = $this->sanitizer->text(self::TEMPLATE_NAME);
+    $p->parent = $this->pages->get($this->saveMessagesParent);
+    $p->title = $this->sanitizer->text($pageName);
+
+    foreach ($this->allFields as $in) {
+      $key = str_replace(self::TAG_NAME . '_', '', $in);
+      if (isset($params[$key])) $p->$in = $params[$key];
+    }
+
+    $p->save();
+
+    return $p->id ? true : false;
+  }
+
+  /**
+   *
+   */
+  private function setSuccessResponse() {
+    http_response_code(201);
+    return json_encode(array('success' => true));
+  }
+
+  /**
+   *
+   */
+  private function getErrorsAndSetResponse($form) {
+    $errors = array();
+    foreach ($form->children as $in) {
+      if ($err = $in->getErrors()) {
+        $key = str_replace(self::TAG_NAME . '_', '', $in->name);
+        $errors[$key] = $err[0];
+      }
+    }
+
+    return $this->setErrorResponse(999, 400, $errors);
+  }
+
+  /**
+   *
+   */
+  private function setErrorResponse($reason, $code = 400, $errors = array()) {
+    http_response_code($code);
 
     switch ($reason) {
       case 1:
-        $msg = 'Empty data.';
+        $msg = $this->_('Wrong request method.');
         break;
       case 2:
-        $msg = 'Wrong content type.';
+        $msg = $this->_('Wrong content type.');
         break;
       case 3:
-        $msg = 'Wrong request method.';
+        $msg = $this->_('Empty data.');
+        break;
+      case 4:
+        $msg = $this->_('Authorization failed.');
+        break;
+      case 5:
+        $msg = $this->_('Page could not be successfully created.');
+        break;
+      case 999:
+        $msg = $this->_('Validation error.');
+        break;
+      default:
+        $msg = $this->_('Something went wrong.');
         break;
     }
 
-    $data = array('success' => false);
+    $data = array('success' => false, 'reason' => $msg);
     if ($errors) $data['errors'] = $errors;
 
     return json_encode($data);
@@ -140,12 +245,21 @@ class Feedback extends WireData implements Module {
     if ($event->arguments[0] !== $this->className) return;
 
     $configData = $event->arguments[1];
+    $configDataOld = $this->modules->getModuleConfigData($this->className);
 
     // create template if it doesn't exist
     $fg = $this->createTemplate($configData);
 
-    // get fields
-    if ($configData['addFields']) {
+    // auto template add / remove fields
+    // compare transferred data with currently saved data
+    $fieldsAdded = array_diff($configData['allFields'], $configDataOld['allFields']);
+    $fieldsDeleted = array_diff($configDataOld['allFields'], $configData['allFields']);
+
+    if ($fieldsAdded) $this->assignNewFields($fieldsAdded, $fg);
+    if ($fieldsDeleted) $this->deleteFields($fieldsDeleted, $fg);
+
+    // create and add fields
+    if ($configData['addFields']) { // OR! a new field is added using ASM select
       $this->addNewFields($configData, $fg);
       $event->setArgument(1, $configData);
     }
@@ -236,6 +350,40 @@ class Feedback extends WireData implements Module {
 
     $configData['allFields'] = $allFields;
     $configData['addFields'] = '';
+  }
+
+  /**
+   * Add new fields
+   *
+   * @param array $newFields
+   * @param Fieldgroup $fg
+   */
+  private function assignNewFields($newFields, $fg) {
+    foreach ($newFields as $name) {
+      $f = $this->fields->get($name);
+
+      if ($f && $fg) {
+        $fg->add($f); // add field to fieldgroup
+        $fg->save(); // save fieldgroup
+      }
+    }
+  }
+
+  /**
+   * Delete fields
+   *
+   * @param array $newFields
+   * @param Fieldgroup $fg
+   */
+  private function deleteFields($deleteFields, $fg) {
+    foreach ($deleteFields as $name) {
+      $f = $this->fields->get($name);
+
+      if ($f && $fg) {
+        $fg->remove($f); // remove field from fieldgroup
+        $fg->save(); // save fieldgroup
+      }
+    }
   }
 
 }
