@@ -6,7 +6,7 @@
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.0.3
+* @version 0.0.4
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -15,7 +15,7 @@
 /**
 * Class Feedback
 */
-class Feedback extends WireData implements Module {
+class Feedback extends Process implements Module {
 
   /**
    * Get module information
@@ -26,7 +26,7 @@ class Feedback extends WireData implements Module {
     return array(
       'title' => 'Feedback',
       'summary' => 'Save feedack received via json and display it (backend).',
-      'version' => 003,
+      'version' => 004,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -45,6 +45,16 @@ class Feedback extends WireData implements Module {
   const TAG_NAME = 'feedback';
 
   /**
+   * admin page name
+   */
+  const ADMIN_PAGE_NAME = 'feedback';
+
+  /**
+   * field name whether the entry has been viewed
+   */
+  const FIELD_VIEWED = 'feedback_viewed';
+
+  /**
    * Initialize the module - ready
    *
    * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
@@ -52,6 +62,90 @@ class Feedback extends WireData implements Module {
    */
   public function ready() {
     $this->addHookBefore('Modules::saveModuleConfigData', $this, 'addFields');
+  }
+
+  /**
+   *
+   */
+  public function ___execute() {
+    if ($this->input->get->entry) return $this->getDetailView();
+
+    return $this->getListView();
+  }
+
+  /**
+   *
+   */
+  private function getDetailView() {
+    $entry = $this->pages->get($this->input->get->entry);
+    $created = date("d.m.Y, g:i a", $entry->created);
+
+    // CHANGE READ STATE
+    if ($entry->{self::FIELD_VIEWED} === 0) {
+      $entry->setAndSave(self::FIELD_VIEWED, 1);
+    }
+
+    // definitionlist
+    $out = '<dl>';
+    $out .= "<dt>{$this->_('Date')}</dt><dd>$created</dd>";
+
+    foreach ($this->allFields as $f) {
+      $field = $this->fields->get($f);
+      $label = $field->label;
+      $body = $field->type instanceof FieldtypeOptions ? $entry->$f->title : nl2br($entry->$f);
+
+      $out .= "<dt>$label</dt><dd>$body</dd>";
+    }
+
+    $out .= '</dl>';
+
+    // backlink
+    $overview = $this->page->url;
+    $icon = '<i class="fa fa-fw fa-angle-double-left"></i>';
+    $out .= "<a href='$overview'>{$icon} {$this->_('back to overview')}</a>";
+
+    return $out;
+  }
+
+  /**
+   *
+   */
+  private function getListView() {
+    $table = $this->wire('modules')->get('MarkupAdminDataTable');
+    $table->setSortable(true);
+    $table->setEncodeEntities(false);
+
+    // table header
+    $headerRow = array('view');
+    foreach ($this->allFields as $f) {
+      $field = $this->fields->get($f);
+      if ($field->type instanceof FieldtypeTextarea) continue;
+      $headerRow[] = $field->label;
+    }
+    $headerRow[] = $this->_('Date');
+    $table->headerRow($headerRow);
+
+    // table content
+    $entries = $this->pages->find('template=' . self::TEMPLATE_NAME . ',sort=-created,limit=' . $this->limit);
+    if ($entries->count === 0) return $this->_('There are no entries available yet.');
+    foreach ($entries as $entry) {
+      $iconMarkup = '<i class="fa fa-fw fa-%s"></i>';
+      $icon = sprintf($iconMarkup, $entry->{self::FIELD_VIEWED} ? 'eye' : 'eye-slash');
+      $url = $this->page->url . '?entry=' . $entry->id;
+      $link = "<a href='$url' title='{$this->_('Details')}'>$icon</a>";
+      $tableRow = array($link);
+      foreach ($this->allFields as $f) {
+        $field = $this->fields->get($f);
+        if ($field->type instanceof FieldtypeTextarea) continue;
+        $tableRow[] = $field->type instanceof FieldtypeOptions ? $entry->$f->title : $entry->$f;
+      }
+
+      $tableRow[] = date("d.m.Y, g:i a", $entry->created);
+
+      $table->row($tableRow);
+    }
+
+    return $table->render() . $entries->renderPager();
   }
 
   /**
@@ -309,6 +403,18 @@ class Feedback extends WireData implements Module {
       $template->noAppendTemplateFile = 1;
       $template->tags = self::TAG_NAME;
       $template->save();
+
+      // add field whether the entry has been viewed
+      $f = new Field();
+      $f->type = $this->modules->get('FieldtypeCheckbox');
+      $f->name = self::FIELD_VIEWED;
+      $f->label = $this->_('Viewed');
+      $f->tags = self::TAG_NAME;
+      $f->columnWidth = '25';
+      $f->save();
+
+      $fg->add($f); // add field to fieldgroup
+      $fg->save(); // save fieldgroup
     }
 
     $this->validateParent($configData);
@@ -402,6 +508,54 @@ class Feedback extends WireData implements Module {
         $fg->remove($f); // remove field from fieldgroup
         $fg->save(); // save fieldgroup
       }
+    }
+  }
+
+  /**
+   * Return the pages that this Processes are installed on
+   */
+  protected function getInstalledPage() {
+    $admin = $this->pages->get($this->config->adminRootPageID);
+    $parent = $admin->child('name=setup');
+    if (!$parent->id) $parent = $admin;
+
+    $pageAdmin = $parent->child('name=' . self::ADMIN_PAGE_NAME);
+    if (!$pageAdmin->id) {
+      $pageAdmin = new Page();
+      $pageAdmin->parent = $parent;
+      $pageAdmin->template = $this->templates->get('admin');
+      $pageAdmin->name = self::ADMIN_PAGE_NAME;
+      $pageAdmin->title = $this->_('Feedback');
+      $pageAdmin->process = $this;
+      $pageAdmin->sort = $parent->numChildren;
+      $pageAdmin->save();
+    }
+
+    return $pageAdmin;
+  }
+
+  /**
+   * Install routine
+   * A new page with this Process module assigned is created.
+   */
+  public function ___install() {
+    // create Admin page
+    $p = $this->getInstalledPage();
+    $this->message("Installed to {$p->path}");
+  }
+
+  /**
+   * Uninstall routine
+   *
+   * This should return the site to the same state
+   * it was in before the module was installed.
+   */
+  public function ___uninstall() {
+    // delete the admin page
+    $p = $this->getInstalledPage();
+    if ($p->id) {
+      $p->delete();
+      $this->message("Deleted Page: {$p->path}");
     }
   }
 
