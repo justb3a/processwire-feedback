@@ -15,8 +15,7 @@ class FeedbackConfig extends ModuleConfig {
       'allFields' => array(),
       'addFields' => '',
       'saveMessagesParent' => false,
-      'saveMessagesScheme' => '',
-      'limit' => 20
+      'saveMessagesScheme' => ''
     );
   }
 
@@ -95,15 +94,6 @@ class FeedbackConfig extends ModuleConfig {
       $f = $this->fields->get($aField);
       $field->addOption($f->name, $f->name);
     }
-    $inputfields->add($field);
-
-    // field limit
-    $field = $this->modules->get('InputfieldInteger');
-    $field->name = 'limit';
-    $field->label = __('Number of entries per page');
-    $field->description = __('The amount of entries per page, defaults to 20.');
-    $field->columnWidth = 50;
-    $field->required = 1;
     $inputfields->add($field);
 
     return $inputfields;
