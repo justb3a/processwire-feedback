@@ -6,7 +6,7 @@
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.0.2
+* @version 0.0.3
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -26,7 +26,7 @@ class Feedback extends WireData implements Module {
     return array(
       'title' => 'Feedback',
       'summary' => 'Save feedack received via json and display it (backend).',
-      'version' => 002,
+      'version' => 003,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -71,7 +71,7 @@ class Feedback extends WireData implements Module {
     if (!$params) return $this->setErrorResponse(3);
 
     // validate authentication
-    if (!$this->isValidAuthentification($params)) return $this->setErrorResponse(4, 401);
+    if (!$this->isValidAuthentification($params)) return $this->setErrorResponse(4);
 
     // build form
     $form = $this->buildAndProcessForm($params);
@@ -197,41 +197,60 @@ class Feedback extends WireData implements Module {
       }
     }
 
-    return $this->setErrorResponse(999, 400, $errors);
+    return $this->setErrorResponse(999, $errors);
   }
 
   /**
    *
    */
-  private function setErrorResponse($reason, $code = 400, $errors = array()) {
-    http_response_code($code);
-
+  private function setErrorResponse($reason, $errors = array()) {
     switch ($reason) {
       case 1:
-        $msg = $this->_('Wrong request method.');
+        $code = 400;
+        $error = 'incorrect_request_method';
+        $msg = $this->_('Incorrect request method.');
         break;
       case 2:
-        $msg = $this->_('Wrong content type.');
+        $code = 400;
+        $error = 'incorrect_content_type';
+        $msg = $this->_('Incorrect content type.');
         break;
       case 3:
-        $msg = $this->_('Empty data.');
+        $code = 400;
+        $error = 'missing_parameters';
+        $msg = $this->_('Parameters are missing.');
         break;
       case 4:
+        $code = 401;
+        $error = 'incorrect_client_credentials';
         $msg = $this->_('Authorization failed.');
         break;
       case 5:
+        $code = 503;
+        $error = 'error_saving_request';
         $msg = $this->_('Page could not be successfully created.');
         break;
       case 999:
+        $code = 401;
+        $error = 'validation_error';
         $msg = $this->_('Validation error.');
         break;
       default:
+        $code = 401;
+        $error = 'general_error';
         $msg = $this->_('Something went wrong.');
         break;
     }
 
-    $data = array('success' => false, 'reason' => $msg);
+    $data = array(
+      'success' => false,
+      'error' => $error,
+      'error_description' => $msg
+    );
+
     if ($errors) $data['errors'] = $errors;
+
+    http_response_code($code);
 
     return json_encode($data);
   }
