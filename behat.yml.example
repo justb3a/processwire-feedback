@@ -1,0 +1,12 @@
+# behat.yml
+
+default:
+    suites:
+        default:
+            contexts:
+                - FeatureContext:
+                    - https://base.url
+                    - apiKey
+                    - apiSecret
+                    - {'bodyfields':1,'youprovide':'test','foo':'bar'}
+

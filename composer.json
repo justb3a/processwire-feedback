@@ -1,0 +1,19 @@
+{
+    "name": "processwire/feedback",
+    "description": "Sending and receiving feedback unsing REST.",
+    "type": "library",
+    "require": {
+        "philipbrown/signature-php": "^5.1"
+    },
+    "require-dev": {
+        "behat/behat": "^3.3",
+        "guzzlehttp/guzzle": "^6.2"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Tabea David",
+            "email": "info@justonestep.de"
+        }
+    ]
+}
