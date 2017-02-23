@@ -10,6 +10,7 @@ class FeedbackConfig extends ModuleConfig {
    */
   public function getDefaults() {
     return array(
+      'authentication' => 'sha',
       'apiUser' => '',
       'apiKey' => '',
       'allFields' => array(),
@@ -30,6 +31,34 @@ class FeedbackConfig extends ModuleConfig {
 
     // get inputfields
     $inputfields = parent::getInputfields();
+
+    // field choose authentication method
+    $field = $this->modules->get('InputfieldSelect');
+    $field->name = 'authentication';
+    $field->label = __('Authentication method');
+    $field->description = __('Choose your preferred authentication method, `Hashed signatures` is recommended.');
+
+    $notes = array(
+      __('The popular choice is `HTTP Basic` because all you\'ve to do is to pass your username and password.'),
+      __('However sending such information across the wire isn\'t the most secure approach.'),
+      __('OAuth is another popular choice, but often it\'s an overkill.'),
+      __('Sending the request as a hash (using a shared key and secret including a timestamp so the hash will be different every time) is a good alternative.')
+    );
+
+    $field->notes = implode(' ', $notes);
+    $field->required = 1;
+    $field->addOption('sha', 'Key/Secret using hashed signatures');
+    $field->addOption('http', 'Basic HTTP authentication');
+    $inputfields->add($field);
+
+
+// HTTP Basic is a popular choice because of how easy it is to use. All you have to do is copy and paste your username and password or API key and you can start interacting with the API straight away.
+
+// However sending your username and password or API key across the wire isn’t the most secure approach (Why the hell does your API still use HTTP Basic Auth?).
+
+// Oauth is another popular choice, but it is probably overkill if all you want to do is to authenticate your application with your API.
+
+// A third option is to use a shared key and secret to hash the request. This means the request is sent as a hash, and can include a timestamp so the hash will be different every time you send it.
 
     // field apiUser
     $field = $this->modules->get('InputfieldText');
