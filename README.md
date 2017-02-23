@@ -17,6 +17,13 @@ The API endpoint is the page where the API can be accessed. Go to your ProcessWi
 
 ## Module settings
 
+First you've to decide whether you want to use **Basic HTTP Authentication** or **Key/Secret using hashed signatures** (strongly recommended!).
+
+> The popular choice is HTTP Basic because all you've to do is to pass your username and password.
+> However sending such information across the wire isn't the most secure approach.
+> OAuth is another popular choice, but often it's an overkill.
+> Sending the request as a hash (using a shared key and secret including a timestamp so the hash will be different every time) is a good alternative.
+
 Fill in module settings, add all fields you want to attach to the form. You could either use existing fields or create new ones. All new fields will be prefixed with `feedback_`.
 
 If you want to change the field settings, edit the field and change all settings there (e.g. fieldtype, required, length).
@@ -33,6 +40,18 @@ echo $modules->get('Feedback')->saveFeedback();
 
 It’s important that this template includes *”only”* the line above.
 
+### Sending Feedback
+
+```php
+$params = array(
+  'field1' => 'value1',
+  'field2' => 'value2',
+  ..
+);
+
+$modules->get('Feedback')->sendFeedback($params);
+```
+
 ## API
 
 ### Endpoint
@@ -43,12 +62,7 @@ POST https://api.url/endpoint/
 
 ### Parameters
 
-| Name    | Type    | Description                                           |
-|---------|---------|-------------------------------------------------------|
-| subject | integer | Provide an ID to assign the feedback to a given topic |
-| name    | string  | name                                                  |
-| email   | string  | valid email-address                                   |
-| message | string  | message                                               |
+All the fields you've added in module settings.
 
 ### Content Type
 
@@ -161,10 +175,10 @@ If the parameters does not pass the validation you get the following error respo
 }
 ```
 
-### Example using curl
+### Example using curl [Basic HTTP Authentication]
 
 ```
-curl -i -H "Content-Type: application/json" --user myuser:12345 -X POST -d '{"subject":"2","name":"test","email":"xyz@foo.de","message":"It Works :)"}' https://api.url/endpoint/
+curl -i -H "Content-Type: application/json" --user myuser:12345 -X POST -d '{"field1":"2","field2":"test","field3":"xyz@foo.de","field4":"It Works :)"}' https://api.url/endpoint/
 ```
 
 Response
@@ -183,4 +197,26 @@ Pragma: no-cache
 X-Powered-By: ProcessWire CMS
 
 {"success":true}
+```
+
+## Testing
+
+First you've to install the required composer packages:
+
+```
+composer install
+```
+
+Then copy `behat.yml.example` and rename it to `behat.yml`.  
+Now edit the copied file and replace everything below `FeatureContext`:
+
+1. the baseurl containing `http[s]`
+2. valid apiKey
+3. valid apiKey
+4. json including all needed parameters including valid values
+
+Now you should be able to execute the following command:
+
+```
+$ vendor/bin/behat
 ```
