@@ -76,6 +76,11 @@ class Feedback extends WireData implements Module {
    */
   public function sendFeedback($params) {
     $path = $this->pages->get($this->saveMessagesParent)->httpUrl;
+
+    // correct path, fix for multisite testing
+    // if path is something like `http://main.sittehttp://current.site/endpoint/`
+    if (strrpos($path, 'http') !== 0) $path = substr($path, strrpos($path, 'http'));
+
     $http = new WireHttp;
     $http->setHeader('content-type', 'application/json; charset=utf-8');
     // $http->setHeader('apiUser', $this->apiUser); // api key: rename apiuser:apikey - key:secret @todo!!
@@ -124,7 +129,6 @@ class Feedback extends WireData implements Module {
     // save feedback
     $success = $this->createFeedback($params);
     if (!$success) return $this->setErrorResponse(5);
-
 
     return $this->setSuccessResponse();
   }

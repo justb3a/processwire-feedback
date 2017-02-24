@@ -208,7 +208,7 @@ composer install
 ```
 
 Then copy `behat.yml.example` and rename it to `behat.yml`.  
-Now edit the copied file and replace everything below `FeatureContext` and `BasichttpContext`:
+Now edit the copied file and replace everything below `AuthenticationContext`:
 
 1. the baseurl containing `http[s]`
 2. valid apiKey

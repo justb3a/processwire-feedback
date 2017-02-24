@@ -1,16 +1,25 @@
 <?php
 
 use Behat\Behat\Context\Context;
-use Behat\Gherkin\Node\PyStringNode;
-use Behat\Gherkin\Node\TableNode;
+use Behat\Behat\Hook\Scope\BeforeScenarioScope;
 use GuzzleHttp\Client;
+use PhilipBrown\Signature\Auth;
+use PhilipBrown\Signature\Token;
+use PhilipBrown\Signature\Request;
+use PhilipBrown\Signature\Guards\CheckKey;
+use PhilipBrown\Signature\Guards\CheckVersion;
+use PhilipBrown\Signature\Guards\CheckTimestamp;
+use PhilipBrown\Signature\Guards\CheckSignature;
+use PhilipBrown\Signature\Exceptions\SignatureException;
 
 /**
  * Defines application features from the specific context.
  */
-class BasichttpContext implements Context {
+class AuthenticationContext implements Context {
+  private $_suite;
   public $_response;
   private $_params;
+  private $_pwconnector;
 
   /**
     * Initializes context.
@@ -35,7 +44,38 @@ class BasichttpContext implements Context {
     );
   }
 
+  /** @BeforeScenario */
+  public function gatherContexts(BeforeScenarioScope $scope) {
+    $this->_suite = $scope->getSuite()->getName();
+  }
+
   private function send() {
+    if ($this->_suite === 'hashed') {
+      $this->sendHashed();
+    } else {
+      $this->sendBasicHttp();
+    }
+  }
+
+  // hashed
+  private function sendHashed() {
+    $token = new Token($this->_params['key'], $this->_params['secret']);
+    $request = new Request($this->_params['method'], $this->_params['endpoint'], $this->_params['data']);
+    $authParams = $request->sign($token);
+    $queryParams = $this->_params['data'] ? array_merge($authParams, $this->_params['data']) : array();
+
+    $client = new Client(array(
+      'headers'  => ['content-type' => $this->_params['content-type']],
+      'body' => json_encode($queryParams),
+      'http_errors' => false
+    ));
+
+    $this->_response = $client->request($this->_params['method'], $this->_params['endpoint']);
+  }
+
+
+  // basic http auth
+  private function sendBasicHttp() {
     $client = new Client(array(
       'headers' => array('content-type' => $this->_params['content-type']),
       'auth' => array($this->_params['key'], $this->_params['secret']),
@@ -98,7 +138,7 @@ class BasichttpContext implements Context {
    * @Then /^the response should be JSON$/
    */
   public function theResponseShouldBeJson() {
-    $data = json_decode($this->_response->getBody(true));
+    $data = $this->getData();
     if (empty($data)) {
       throw new Exception("Response was not JSON\n" . $this->_response);
     }
@@ -114,17 +154,27 @@ class BasichttpContext implements Context {
     }
   }
 
+  private function getData() {
+    if ($this->_response instanceof GuzzleHttp\Psr7\Response) {
+      $data = json_decode($this->_response->getBody(true));
+    } else {
+      $data = json_decode($this->_response);
+    }
+
+    return $data;
+  }
+
   /**
    * @Given /^the response has a "([^"]*)" property$/
    */
   public function theResponseHasAProperty($propertyName) {
-    $data = json_decode($this->_response->getBody(true));
+    $data = $this->getData();
     if (!empty($data)) {
       if (!isset($data->$propertyName)) {
         throw new Exception("Property '".$propertyName."' is not set!\n");
       }
     } else {
-      throw new Exception("Response was not JSON\n" . $this->_response->getBody(true));
+      throw new Exception("Response was not JSON\n" . $data);
     }
   }
 
@@ -140,7 +190,7 @@ class BasichttpContext implements Context {
    * @Then /^the "([^"]*)" property equals "([^"]*)"$/
    */
   public function thePropertyEquals($propertyName, $propertyValue) {
-    $data = json_decode($this->_response->getBody(true));
+    $data = $this->getData();
 
     if (!empty($data)) {
       if (!isset($data->$propertyName)) {
@@ -154,4 +204,15 @@ class BasichttpContext implements Context {
       throw new Exception("Response was not JSON\n" . $this->_response->getBody(true));
     }
   }
+
+    /**
+     * @Given I send feedback via ProcessWire
+     */
+    public function iSendFeedbackViaProcesswire() {
+    $this->_pwconnector = new PwConnector();
+    $this->_pwconnector->bootstrapProcessWire();
+
+    $this->_response = \ProcessWire\wire('modules')->get('Feedback')->sendFeedback($this->_params['data']);
+  }
+
 }

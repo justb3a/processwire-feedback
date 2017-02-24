@@ -5,7 +5,7 @@ default:
         hashed:
             paths: [ %paths.base%/features/hashed ]
             contexts:
-                - FeatureContext:
+                - AuthenticationContext:
                     - https://base.url/endpoint/
                     - apiKey
                     - apiSecret
@@ -13,10 +13,8 @@ default:
         basichttp:
             paths: [ %paths.base%/features/basichttp ]
             contexts:
-                - BasichttpContext:
+                - AuthenticationContext:
                     - https://base.url/endpoint/
                     - apiKey
                     - apiSecret
                     - {'bodyfields':1,'youprovide':'test','foo':'bar'}
-
-
