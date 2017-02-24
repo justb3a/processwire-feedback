@@ -32,108 +32,78 @@ class FeatureContext implements Context {
     * @param string $secret
     * @param array $data
     */
-  public function __construct($baseUrl, $key, $secret, $data) {
+  public function __construct($url, $key, $secret, $data) {
     $this->_params = array(
-      'baseurl' => $baseUrl,
+      'content-type' => 'application/json',
+      'method' => 'POST',
+      'endpoint' => $url,
       'key' => $key,
       'secret' => $secret,
       'data' => $data
     );
   }
 
-  /**
-   * @When /^I request "([^"]*)"$/
-   */
-  public function iRequest($uri) {
-    $this->_params['endpoint'] = $this->_params['baseurl'] . $uri;
+  private function send() {
+    $token = new Token($this->_params['key'], $this->_params['secret']);
+    $request = new Request($this->_params['method'], $this->_params['endpoint'], $this->_params['data']);
+    $authParams = $request->sign($token);
+    $queryParams = $this->_params['data'] ? array_merge($authParams, $this->_params['data']) : array();
+
+    $client = new Client(array(
+      'headers'  => ['content-type' => $this->_params['content-type']],
+      'body' => json_encode($queryParams),
+      'http_errors' => false
+    ));
+
+    $this->_response = $client->request($this->_params['method'], $this->_params['endpoint']);
   }
 
   /**
   * @Given I pass all data correctly
   */
   public function iPassAllDataCorrectly() {
-    $token = new Token($this->_params['key'], $this->_params['secret']);
-    $request = new Request('POST', $this->_params['endpoint'], $this->_params['data']);
-    $authParams = $request->sign($token);
-    $queryParams = array_merge($authParams, $this->_params['data']);
-
-    $client = new Client(array(
-      'headers'  => ['content-type' => 'application/json'],
-      'body' => json_encode($queryParams)
-    ));
-
-    $this->_response = $client->request('POST', $this->_params['endpoint']);
+    $this->send();
   }
 
   /**
    * @Given I pass incorrect content-type :type
    */
   public function iPassIncorrectContentType($type) {
-    $token = new Token($this->_params['key'], $this->_params['secret']);
-    $request = new Request('POST', $this->_params['endpoint'], $this->_params['data']);
-    $authParams = $request->sign($token);
-    $queryParams = array_merge($authParams, $this->_params['data']);
-
-    $client = new Client(array(
-      'headers'  => ['content-type' => $type],
-      'body' => json_encode($queryParams),
-      'http_errors' => false
-    ));
-
-    $this->_response = $client->request('POST', $this->_params['endpoint']);
+    $this->_params['content-type'] = $type;
+    $this->send();
   }
 
   /**
    * @Given I pass incorrect request method :method
    */
   public function iPassIncorrectRequestMethod($method) {
-    $token = new Token($this->_params['key'], $this->_params['secret']);
-    $request = new Request($method, $this->_params['endpoint'], $this->_params['data']);
-    $authParams = $request->sign($token);
-    $queryParams = array_merge($authParams, $this->_params['data']);
-
-    $client = new Client(array(
-      'headers'  => ['content-type' => 'application/json'],
-      'body' => json_encode($queryParams),
-      'http_errors' => false
-    ));
-
-    $this->_response = $client->request($method, $this->_params['endpoint']);
+    $this->_params['method'] = $method;
+    $this->send();
   }
 
   /**
    * @Given I pass incorrect client credentials
    */
   public function iPassIncorrectClientCredentials() {
-    $token = new Token('incorrectKey', 'incorrectSecret');
-    $request = new Request('POST', $this->_params['endpoint'], $this->_params['data']);
-    $authParams = $request->sign($token);
-    $queryParams = array_merge($authParams, $this->_params['data']);
-
-    $client = new Client(array(
-      'headers'  => ['content-type' => 'application/json'],
-      'body' => json_encode($queryParams),
-      'http_errors' => false
-    ));
-
-    $this->_response = $client->request('POST', $this->_params['endpoint']);
+    $this->_params['key'] = 'incorrectKey';
+    $this->_params['secret'] = 'incorrectSecret';
+    $this->send();
   }
 
   /**
    * @Given I do not pass any parameters
    */
   public function iDoNotPassAnyParameters() {
-    $token = new Token($this->_params['key'], $this->_params['secret']);
-    $request = new Request('POST', $this->_params['endpoint'], $this->_params['data']);
-    $authParams = $request->sign($token);
-    $queryParams = array_merge($authParams, $this->_params['data']);
+    $this->_params['data'] = array();
+    $this->send();
+  }
 
-    $client = new Client(array(
-      'headers'  => ['content-type' => 'application/json'],
-      'http_errors' => false
-    ));
-
-    $this->_response = $client->request('POST', $this->_params['endpoint']);
+  /**
+   * @Given I pass the property :propertyName with value :propertyValue
+   */
+  public function iPassThePropertyWithValue($propertyName, $propertyValue) {
+    $this->_params['data'] = array_merge($this->_params['data'], array($propertyName => $propertyValue));
+    $this->send();
   }
 
   /**

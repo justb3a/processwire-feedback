@@ -305,12 +305,12 @@ class Feedback extends WireData implements Module {
         $msg = $this->_('Page could not be successfully created.');
         break;
       case 999:
-        $code = 401;
+        $code = 400;
         $error = 'validation_error';
         $msg = $this->_('Validation error.');
         break;
       default:
-        $code = 401;
+        $code = 400;
         $error = 'general_error';
         $msg = $this->_('Something went wrong.');
         break;
