@@ -208,15 +208,18 @@ composer install
 ```
 
 Then copy `behat.yml.example` and rename it to `behat.yml`.  
-Now edit the copied file and replace everything below `FeatureContext`:
+Now edit the copied file and replace everything below `FeatureContext` and `BasichttpContext`:
 
 1. the baseurl containing `http[s]`
 2. valid apiKey
 3. valid apiKey
 4. json including all needed parameters including valid values
 
+If you're using **Basic HTTP Authentication** use test suite **basichttp**, otherwise use **hashed**.
+
 Now you should be able to execute the following command:
 
 ```
-$ vendor/bin/behat
+$ vendor/bin/behat --suite=basichttp
+$ vendor/bin/behat --suite=hashed
 ```

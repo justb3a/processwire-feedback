@@ -55,5 +55,3 @@ Scenario: Unsuccessfull api request because of invalid params
   And the "success" property equals boolean "false"
   And the response has a "error" property
   And the "error" property equals "validation_error"
-
-

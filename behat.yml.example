@@ -2,11 +2,21 @@
 
 default:
     suites:
-        default:
+        hashed:
+            paths: [ %paths.base%/features/hashed ]
             contexts:
                 - FeatureContext:
-                    - https://base.url
+                    - https://base.url/endpoint/
                     - apiKey
                     - apiSecret
                     - {'bodyfields':1,'youprovide':'test','foo':'bar'}
+        basichttp:
+            paths: [ %paths.base%/features/basichttp ]
+            contexts:
+                - BasichttpContext:
+                    - https://base.url/endpoint/
+                    - apiKey
+                    - apiSecret
+                    - {'bodyfields':1,'youprovide':'test','foo':'bar'}
+
 
