@@ -16,7 +16,8 @@ class FeedbackConfig extends ModuleConfig {
       'allFields' => array(),
       'addFields' => '',
       'saveMessagesParent' => false,
-      'saveMessagesScheme' => ''
+      'saveMessagesScheme' => '',
+      'api' => '[{"name":"","key":"","secret":"","email":""}]'
     );
   }
 
@@ -51,14 +52,12 @@ class FeedbackConfig extends ModuleConfig {
     $field->addOption('http', 'Basic HTTP authentication');
     $inputfields->add($field);
 
-
-// HTTP Basic is a popular choice because of how easy it is to use. All you have to do is copy and paste your username and password or API key and you can start interacting with the API straight away.
-
-// However sending your username and password or API key across the wire isn’t the most secure approach (Why the hell does your API still use HTTP Basic Auth?).
-
-// Oauth is another popular choice, but it is probably overkill if all you want to do is to authenticate your application with your API.
-
-// A third option is to use a shared key and secret to hash the request. This means the request is sent as a hash, and can include a timestamp so the hash will be different every time you send it.
+    // field api
+    $field = $this->modules->get('InputfieldTextarea');
+    $field->name = 'api';
+    $field->label = __('API');
+    $field->collapsed = Inputfield::collapsedNoLocked;
+    $inputfields->add($field);
 
     // field apiUser
     $field = $this->modules->get('InputfieldText');

@@ -15,7 +15,7 @@ use PhilipBrown\Signature\Exceptions\SignatureException;
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.0.6
+* @version 0.0.7
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -35,7 +35,7 @@ class Feedback extends WireData implements Module {
     return array(
       'title' => 'Feedback',
       'summary' => 'Save feedack received via json and display it (backend).',
-      'version' => 006,
+      'version' => 007,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -67,6 +67,9 @@ class Feedback extends WireData implements Module {
    */
   public function ready() {
     $this->addHookBefore('Modules::saveModuleConfigData', $this, 'addFields');
+
+    // @todo: only include on module edit page
+    $this->config->scripts->add($this->config->urls->siteModules . $this->className . '/Feedback.js');
 
     require_once($this->config->paths->{$this->className} . 'vendor/autoload.php');
   }
@@ -344,6 +347,12 @@ class Feedback extends WireData implements Module {
 
     $configData = $event->arguments[1];
     $configDataOld = $this->modules->getModuleConfigData($this->className);
+
+    if (isset($_POST['apidata'])) {
+      $apiData = array_values($_POST['apidata']);
+      $configData['api'] = json_encode($apiData);
+      $event->arguments(1, $configData);
+    }
 
     // create template if it doesn't exist
     $fg = $this->createTemplate($configData);
