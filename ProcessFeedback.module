@@ -6,7 +6,7 @@
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.0.7
+* @version 0.1.0
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -42,14 +42,16 @@ class ProcessFeedback extends Process implements Module {
   const ADMIN_PAGE_NAME = 'feedback';
 
   /**
-   *
+   * Initialize the module
    */
   public function init() {
     $this->configData = (object)$this->modules->getModuleConfigData('Feedback');
   }
 
   /**
+   * Execute the process
    *
+   * @return string
    */
   public function ___execute() {
     if ($this->input->get->entry) return $this->getDetailView();
@@ -58,7 +60,9 @@ class ProcessFeedback extends Process implements Module {
   }
 
   /**
+   * Get detail view
    *
+   * @return string
    */
   private function getDetailView() {
     $entry = $this->pages->get($this->input->get->entry);
@@ -92,7 +96,9 @@ class ProcessFeedback extends Process implements Module {
   }
 
   /**
+   * Get list view
    *
+   * @return string
    */
   private function getListView() {
     $table = $this->wire('modules')->get('MarkupAdminDataTable');
@@ -132,12 +138,12 @@ class ProcessFeedback extends Process implements Module {
   /**
    * Return the pages that this Processes are installed on
    */
-  protected function getInstalledPage() {
+  public function getInstalledPage() {
     $admin = $this->pages->get($this->config->adminRootPageID);
-    $parent = $admin->child('name=setup');
+    $parent = $admin->child('name=setup,include=all');
     if (!$parent->id) $parent = $admin;
 
-    $pageAdmin = $parent->child('name=' . self::ADMIN_PAGE_NAME);
+    $pageAdmin = $parent->child('name=' . self::ADMIN_PAGE_NAME . ',include=all');
     if (!$pageAdmin->id) {
       $pageAdmin = new Page();
       $pageAdmin->parent = $parent;

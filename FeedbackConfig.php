@@ -59,24 +59,6 @@ class FeedbackConfig extends ModuleConfig {
     $field->collapsed = Inputfield::collapsedNoLocked;
     $inputfields->add($field);
 
-    // field apiUser
-    $field = $this->modules->get('InputfieldText');
-    $field->name = 'apiUser';
-    $field->label = __('API username');
-    $field->description = __('For basic HTTP Authentification.');
-    $field->columnWidth = 50;
-    $field->required = 1;
-    $inputfields->add($field);
-
-    // field apiKey
-    $field = $this->modules->get('InputfieldText');
-    $field->name = 'apiKey';
-    $field->label = __('API Key');
-    $field->description = __('For basic HTTP Authentification.');
-    $field->columnWidth = 50;
-    $field->required = 1;
-    $inputfields->add($field);
-
     // allFields field
     $field = $this->modules->get('InputfieldAsmSelect');
     $field->description = __('Add all fields (choose from existing ones) which should be attached to the form.');
@@ -122,6 +104,13 @@ class FeedbackConfig extends ModuleConfig {
       $f = $this->fields->get($aField);
       $field->addOption($f->name, $f->name);
     }
+    $inputfields->add($field);
+
+    // field emailfrom
+    $field = $this->modules->get('InputfieldEmail');
+    $field->name = 'emailfrom';
+    $field->label = __('Sender E-Mail-Address');
+    $field->required = true;
     $inputfields->add($field);
 
     return $inputfields;

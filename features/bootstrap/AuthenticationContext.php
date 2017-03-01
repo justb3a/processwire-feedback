@@ -205,14 +205,24 @@ class AuthenticationContext implements Context {
     }
   }
 
-    /**
-     * @Given I send feedback via ProcessWire
-     */
-    public function iSendFeedbackViaProcesswire() {
+  /**
+    * @Given I send feedback via ProcessWire
+    */
+  public function iSendFeedbackViaProcesswire() {
     $this->_pwconnector = new PwConnector();
     $this->_pwconnector->bootstrapProcessWire();
 
     $this->_response = \ProcessWire\wire('modules')->get('Feedback')->sendFeedback($this->_params['data']);
+  }
+
+  /**
+   * @Given I send feedback including key
+   */
+  public function iSendFeedbackIncludingKey() {
+    $this->_pwconnector = new PwConnector();
+    $this->_pwconnector->bootstrapProcessWire();
+
+    $this->_response = \ProcessWire\wire('modules')->get('Feedback')->sendFeedback($this->_params['data'], 'incorrectKey');
   }
 
 }

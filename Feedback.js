@@ -1,16 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const apiWrapper = document.getElementById('wrap_Inputfield_api');
+  const elems = [ 'name', 'key', 'secret', 'email' ];
+  const classes = {
+    wrapper: 'Inputfield_api',
+    trash: 'js-feedback-trash',
+    plus: 'js-feedback-plus'
+  };
+
+  const apiWrapper = document.querySelector(`.${classes.wrapper}`);
 
   if (apiWrapper) {
     const api = apiWrapper.querySelector('.InputfieldContent');
     const data = JSON.parse(api.textContent, true);
-    let dataCount = Object.keys(data).length;
     const table = document.createElement('table');
-    const tableheader = '<thead><tr><th>Name</th><th>Key</th><th>Secret</th><th>Email</th><th></th></tr></thead>';
     const plus = document.createElement('div');
-    const plusContent = '<a href="#" class="js-feedback-plus"><i class="fa fa-plus-square"></i> Add Row</a>';
     const trash = document.createElement('td');
-    const trashContent = '<a href="#" class="js-feedback-trash"><i class="fa fa-trash"></i></a>';
+    let dataCount = Object.keys(data).length;
     let initial = true;
 
     // add input Element
@@ -26,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // delete row
-    const addTrashFunc = (i) => {
+    const addTrashFunc = i => {
       i.addEventListener('click', e => {
         e.stopPropagation();
         e.preventDefault();
@@ -40,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const key in data) {
         const wrapper = document.createElement('tr');
 
-        [ 'name', 'key', 'secret', 'email' ].forEach(prop => {
+        elems.forEach(prop => {
           const td = document.createElement('td');
           const input = addInput(key, prop);
 
@@ -58,14 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
         table.appendChild(wrapper);
       }
 
-      api.appendChild(document.createElement('br'));
+      api.textContent = '';
       api.appendChild(table);
       api.appendChild(plus);
     };
 
     // init trash functionality
     const initTrash = () => {
-      const trashIcons = api.querySelectorAll('.js-feedback-trash');
+      const trashIcons = api.querySelectorAll(`.${classes.trash}`);
 
       [ ...trashIcons ].forEach(i => {
         addTrashFunc(i);
@@ -74,13 +78,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // clone last element
     const initClone = () => {
-      api.querySelector('.js-feedback-plus').addEventListener('click', e => {
+      api.querySelector(`.${classes.plus}`).addEventListener('click', e => {
         e.preventDefault();
 
         const wrapper = document.createElement('tr');
         const i = trash.cloneNode(true);
 
-        [ 'name', 'key', 'secret', 'email' ].forEach(prop => {
+        elems.forEach(prop => {
           const td = document.createElement('td');
           const input = addInput(dataCount, prop);
 
@@ -96,9 +100,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const init = () => {
-      table.innerHTML = tableheader;
-      plus.innerHTML = plusContent;
-      trash.innerHTML = trashContent;
+      let tableContent = '';
+
+      elems.forEach(prop => {
+        tableContent += `<th>${prop.substr(0, 1).toUpperCase()}${prop.substr(1)}</th>`;
+      });
+
+      table.innerHTML = `<thead><tr>${tableContent}<th></th></tr></thead>`;
+      plus.innerHTML = `<a href="#" class="${classes.plus}"><i class="fa fa-plus-square"></i> Add Row</a>`;
+      trash.innerHTML = `<a href="#" class="${classes.trash}"><i class="fa fa-trash"></i></a>`;
+
       createTable();
       initClone();
       initTrash();

@@ -15,7 +15,7 @@ use PhilipBrown\Signature\Exceptions\SignatureException;
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.0.7
+* @version 0.1.0
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -34,8 +34,8 @@ class Feedback extends WireData implements Module {
   public static function getModuleInfo() {
     return array(
       'title' => 'Feedback',
-      'summary' => 'Save feedack received via json and display it (backend).',
-      'version' => 007,
+      'summary' => 'Send and save feedack via json and display it (backend).',
+      'version' => 010,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -60,6 +60,16 @@ class Feedback extends WireData implements Module {
   const FIELD_VIEWED = 'feedback_viewed';
 
   /**
+   * contains used api data
+   */
+  private static $apiDataDefaults = array('name' => '', 'key' => '', 'secret' => '', 'email' => '');
+
+  /**
+   * contains used api data
+   */
+  private $apiData;
+
+  /**
    * Initialize the module - ready
    *
    * ProcessWire calls this when the module is loaded. For 'autoload' modules, this will be called
@@ -67,34 +77,43 @@ class Feedback extends WireData implements Module {
    */
   public function ready() {
     $this->addHookBefore('Modules::saveModuleConfigData', $this, 'addFields');
+    $this->apiData = (object) self::$apiDataDefaults;
 
-    // @todo: only include on module edit page
-    $this->config->scripts->add($this->config->urls->siteModules . $this->className . '/Feedback.js');
+    // only include script on module edit page
+    if ($this->page->path === '/delta/module/' && $this->input->name === $this->className) {
+      $this->config->scripts->add($this->config->urls->siteModules . $this->className . '/Feedback.js');
+    }
 
     require_once($this->config->paths->{$this->className} . 'vendor/autoload.php');
   }
 
   /**
+   * Send Feedback
    *
+   * @param array $params
+   * @param string $apiKey
+   * @return json
    */
-  public function sendFeedback($params) {
+  public function sendFeedback($params, $apiKey = null) {
+    $this->getApiData($apiKey);
     $path = $this->pages->get($this->saveMessagesParent)->httpUrl;
 
+    if (!$this->apiData->key || !$this->apiData->secret) return $this->setErrorResponse(4);
+
     // correct path, fix for multisite testing
-    // if path is something like `http://main.sittehttp://current.site/endpoint/`
+    // if path is something like `http://main.sitehttp://current.site/endpoint/`
     if (strrpos($path, 'http') !== 0) $path = substr($path, strrpos($path, 'http'));
 
     $http = new WireHttp;
     $http->setHeader('content-type', 'application/json; charset=utf-8');
-    // $http->setHeader('apiUser', $this->apiUser); // api key: rename apiuser:apikey - key:secret @todo!!
 
     if ($this->authentication === 'sha') {
-      $token = new Token($this->apiUser, $this->apiKey);
+      $token = new Token($this->apiData->key, $this->apiData->secret);
       $request = new Request('POST', $path, $params);
       $authParams = $request->sign($token);
       $queryParams = array_merge($authParams, $params);
     } else {
-      $http->setHeader('Authorization: Basic', base64_encode("{$this->apiUser}:{$this->apiKey}"));
+      $http->setHeader('Authorization: Basic', base64_encode("{$this->apiData->key}:{$this->apiData->secret}"));
       $queryParams = $params;
     }
 
@@ -102,7 +121,7 @@ class Feedback extends WireData implements Module {
   }
 
   /**
-   *
+   * Save Feedback
    */
   public function saveFeedback() {
     // only accept post requests
@@ -117,10 +136,12 @@ class Feedback extends WireData implements Module {
     if (!$params) return $this->setErrorResponse(3);
 
     // validate authentication
+    if (!$this->apiData->key || !$this->apiData->secret) return $this->setErrorResponse(4);
+
     if ($this->authentication === 'sha') {
-      if (!$this->isValidHashedAuthentification($params)) return $this->setErrorResponse(4);
+      if (!$this->isValidHashedAuthentication($params)) return $this->setErrorResponse(4);
     } else {
-      if (!$this->isValidHttpBasicAuthentification($params)) return $this->setErrorResponse(4);
+      if (!$this->isValidHttpBasicAuthentication($params)) return $this->setErrorResponse(4);
     }
 
     // build form
@@ -130,14 +151,90 @@ class Feedback extends WireData implements Module {
     if ($form->getErrors()) return $this->getErrorsAndSetResponse($form);
 
     // save feedback
-    $success = $this->createFeedback($params);
-    if (!$success) return $this->setErrorResponse(5);
+    $pageId = $this->createFeedback($params);
+    if (!$pageId) return $this->setErrorResponse(5);
+
+    // send notification
+    if ($this->apiData->email) $this->sendMail($pageId);
 
     return $this->setSuccessResponse();
   }
 
   /**
+   * Get Api Data
    *
+   * @param string $apiKey
+   * @param boolean $strict
+   */
+  private function getApiData($apiKey = null, $strict = false) {
+    $keySecretData = json_decode($this->api, true);
+    $index = 0;
+    $validApiKey = $strict ? false : true; // if false, use first entry
+
+    // get first key
+    if ($apiKey) {
+      $validApiKey = false; // if an apiKey is passed, it must match
+
+      // find entry matching key=$key
+      foreach ($keySecretData as $superiorKey => $entryArray) {
+        $key = array_search($apiKey, $entryArray);
+        if ($key && $key === 'key') {
+          $index = $superiorKey;
+          $validApiKey = true;
+          break;
+        }
+      }
+    }
+
+    $this->apiData = $validApiKey ? (object) $keySecretData[$index] : (object) self::$apiDataDefaults;
+  }
+
+  /**
+   * Send Mail
+   *
+   * @param integer $pageId
+   */
+  private function sendMail($pageId) {
+    $p = $this->pages->get($pageId);
+
+    $options = array(
+      'noPermissionCheck' => true,
+      'noInit' => true,
+      'noInstall' => true
+    );
+
+    $link = $this->modules->getModule('ProcessFeedback', $options)->getInstalledPage();
+    $msg = array(
+      $this->_('Hei!'),
+      '',
+      $this->sanitizer->unentities($this->_('You\'ve received a new message:')) . ' ' . $link->httpUrl . '?entry=' . $pageId,
+      ''
+    );
+
+    foreach ($this->allFields as $af) {
+      $field = $this->fields->get($af);
+      $value = $field->type instanceof FieldtypeOptions ? $p->$af->title : $p->$af;
+      $msg[] = $field->label . ': ' . $value;
+    }
+
+    $msg[] = '';
+    $msg[] = '--';
+    $msg[] = $this->_('Sent via ProcessWire');
+
+    try {
+      $wireMail = \ProcessWire\wireMail();
+      $wireMail->to($this->apiData->email);
+      $wireMail->from($this->emailfrom);
+      $wireMail->subject($this->_('Recent Feedback') . " - {$this->apiData->name}");
+      $wireMail->body(implode(PHP_EOL, $msg));
+      $send = $wireMail->send();
+    } catch (\Exception $e) {
+      $this->log->save('errors', $this->className . ': ' . $e->getMessage());
+    }
+  }
+
+  /**
+   * Get passed parameters
    */
   private function getPassedParams() {
     $params = null;
@@ -153,8 +250,8 @@ class Feedback extends WireData implements Module {
       // basic HTTP authetication
       if (isset($_SERVER['PHP_AUTH_USER'])) {
         $credentials = array(
-          'fname' => $_SERVER['PHP_AUTH_USER'],
-          'fpass' => $_SERVER['PHP_AUTH_PW']
+          'auth_key' => $_SERVER['PHP_AUTH_USER'],
+          'auth_secret' => $_SERVER['PHP_AUTH_PW']
         );
 
         $params = array_merge($params, $credentials);
@@ -164,23 +261,31 @@ class Feedback extends WireData implements Module {
       if (isset($params['it'])) unset($params['it']);
     }
 
+    if (isset($params['auth_key'])) $this->getApiData($params['auth_key'], true);
+
     return $params;
   }
 
   /**
+   * Is valid HTTP Basic Authentication
    *
+   * @param array $params
+   * @return boolean
    */
-  private function isValidHttpBasicAuthentification($params) {
-    $isCorrectUser = isset($params['fname']) && $params['fname'] === $this->apiUser;
-    $isCorrectPass = isset($params['fpass']) && $params['fpass'] === $this->apiKey;
+  private function isValidHttpBasicAuthentication($params) {
+    $isCorrectUser = isset($params['auth_key']) && $params['auth_key'] === $this->apiData->key;
+    $isCorrectPass = isset($params['auth_secret']) && $params['auth_secret'] === $this->apiData->secret;
 
     return $isCorrectUser && $isCorrectPass;
   }
 
   /**
+   * Is valid Hashed Authentication
    *
+   * @param array $params
+   * @return boolean
    */
-  private function isValidHashedAuthentification($params) {
+  private function isValidHashedAuthentication($params) {
     $path = $this->pages->get($this->saveMessagesParent)->httpUrl;
     $isValid = true;
     $auth  = new Auth('POST', $path, $params, array(
@@ -190,7 +295,7 @@ class Feedback extends WireData implements Module {
       new CheckSignature
     ));
 
-    $token = new Token($this->apiUser, $this->apiKey);
+    $token = new Token($this->apiData->key, $this->apiData->secret);
 
     try {
       $auth->attempt($token);
@@ -202,7 +307,10 @@ class Feedback extends WireData implements Module {
   }
 
   /**
+   * Build and Process Form
    *
+   * @param array $params
+   * @return InputfieldForm
    */
   private function buildAndProcessForm($params) {
     $form = $this->modules->get('InputfieldForm');
@@ -226,9 +334,11 @@ class Feedback extends WireData implements Module {
     return $form;
   }
 
-  // create the new page
   /**
+   * Create Feedback, save as page
    *
+   * @param array $params
+   * @return mixed
    */
   private function createFeedback($params) {
     $date = new \DateTime();
@@ -251,16 +361,20 @@ class Feedback extends WireData implements Module {
 
     foreach ($this->allFields as $in) {
       $key = str_replace(self::TAG_NAME . '_', '', $in);
-      if (isset($params[$key])) $p->$in = $params[$key];
+      if (isset($params[$key])) {
+        $p->$in = $this->sanitizer->textarea($params[$key], array('stripTags' => false));
+      }
     }
 
     $p->save();
 
-    return $p->id ? true : false;
+    return $p->id ? $p->id : null;
   }
 
   /**
+   * Set success reponse
    *
+   * @return json
    */
   private function setSuccessResponse() {
     http_response_code(201);
@@ -268,7 +382,10 @@ class Feedback extends WireData implements Module {
   }
 
   /**
+   * Get errors and return error response
    *
+   * @param InputfieldForm $form
+   * @return json
    */
   private function getErrorsAndSetResponse($form) {
     $errors = array();
@@ -283,7 +400,11 @@ class Feedback extends WireData implements Module {
   }
 
   /**
+   * Set error response
    *
+   * @param integer $reason
+   * @param array $errors
+   * @return json
    */
   private function setErrorResponse($reason, $errors = array()) {
     switch ($reason) {
@@ -331,7 +452,6 @@ class Feedback extends WireData implements Module {
     );
 
     if ($errors) $data['errors'] = $errors;
-
     http_response_code($code);
 
     return json_encode($data);

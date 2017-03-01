@@ -223,3 +223,26 @@ Now you should be able to execute the following command:
 $ vendor/bin/behat --suite=basichttp
 $ vendor/bin/behat --suite=hashed
 ```
+
+You can also run behat scenarios using tag filters:
+
+```
+$ vendor/bin/behat --suite=hashed --tags @send
+$ vendor/bin/behat --suite=hashed --tags @receive
+$ vendor/bin/behat --suite=hashed --tags "@send&&@success"
+$ vendor/bin/behat --suite=hashed --tags "@send,@success"
+$ vendor/bin/behat --suite=hashed --tags "~@success"
+```
+
+As you see tag filters supports different logical operators:
+
+1. **AND**: separation by `&&`
+2. *OR**: separation by `comma`
+3. *NOT*: prefixing a `~`
+
+Or for example you can run a scenario by using part of the name:
+
+```
+$ vendor/bin/behat --suite=hashed --name 'Send feedback'
+$ vendor/bin/behat --suite=hashed --name 'Unsuccessfull api request'
+```
