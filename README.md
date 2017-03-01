@@ -49,7 +49,9 @@ $params = array(
   ..
 );
 
-$modules->get('Feedback')->sendFeedback($params);
+$key = 'optionalKey'; // if empty the first one from module settings will be taken
+
+$modules->get('Feedback')->sendFeedback($params, $key);
 ```
 
 ## API
@@ -212,7 +214,7 @@ Now edit the copied file and replace everything below `AuthenticationContext`:
 
 1. the baseurl containing `http[s]`
 2. valid apiKey
-3. valid apiKey
+3. valid apiSecret
 4. json including all needed parameters including valid values
 
 If you're using **Basic HTTP Authentication** use test suite **basichttp**, otherwise use **hashed**.
