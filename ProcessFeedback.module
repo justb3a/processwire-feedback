@@ -6,7 +6,7 @@
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.1.0
+* @version 0.1.1
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -26,7 +26,7 @@ class ProcessFeedback extends Process implements Module {
     return array(
       'title' => 'ProcessFeedback',
       'summary' => 'Displays saved feedback (backend).',
-      'version' => 007,
+      'version' => 011,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,

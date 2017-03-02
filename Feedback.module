@@ -15,7 +15,7 @@ use PhilipBrown\Signature\Exceptions\SignatureException;
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.1.0
+* @version 0.1.1
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -35,7 +35,7 @@ class Feedback extends WireData implements Module {
     return array(
       'title' => 'Feedback',
       'summary' => 'Send and save feedack via json and display it (backend).',
-      'version' => 010,
+      'version' => 011,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -60,6 +60,11 @@ class Feedback extends WireData implements Module {
   const FIELD_VIEWED = 'feedback_viewed';
 
   /**
+   * submit field name for form
+   */
+  const SUBMIT = 'submit-feedback';
+
+  /**
    * contains used api data
    */
   private static $apiDataDefaults = array('name' => '', 'key' => '', 'secret' => '', 'email' => '');
@@ -68,6 +73,46 @@ class Feedback extends WireData implements Module {
    * contains used api data
    */
   private $apiData;
+
+  /**
+   * Markup used during the render() method
+   */
+  static protected $markup = array(
+    'list' => "{out}\n",
+    'item' => "\n\t<div {attrs}>\n{out}\n\t</div>",
+    'item_label' => "\n\t\t<label class='form__item--label' for='{for}'>{out}</label>",
+    'item_label_hidden' => "\n\t\t<label class='field__header field__header--hidden {class}'>{out}</label>",
+    'item_content' => "{out}",
+    'item_error' => "\n<p class='field--error--message'>{out}</p>",
+    'item_description' => "\n<p class='field__description'>{out}</p>",
+    'item_head' => "\n<h2>{out}</h2>",
+    'item_notes' => "\n<p class='field__notes'>{out}</p>",
+    'item_icon' => "",
+    'item_toggle' => "",
+    // ALSO:
+    // InputfieldAnything => array( any of the properties above to override on a per-Inputifeld basis)
+  );
+
+   /**
+   * Classes used during the render() method
+   */
+  static protected $classes = array(
+    'form' => 'form  js-simplecontactform', // additional clases for inputfieldform (optional)
+    'list' => 'fields',
+    'list_clearfix' => 'clearfix',
+    'item' => 'form__item form__item--{name}',
+    'item_label' => '', // additional classes for inputfieldheader (optional)
+    'item_content' => '',  // additional classes for inputfieldcontent (optional)
+    'item_required' => 'field--required', // class is for inputfield
+    'item_error' => 'field--error', // note: not the same as markup[item_error], class is for inputfield
+    'item_collapsed' => 'field--collapsed',
+    'item_column_width' => 'field__column',
+    'item_column_width_first' => 'field__column--first',
+    'item_show_if' => 'field--show-if',
+    'item_required_if' => 'field--required-if'
+    // ALSO:
+    // InputfieldAnything => array( any of the properties above to override on a per-Inputifeld basis)
+  );
 
   /**
    * Initialize the module - ready
@@ -85,6 +130,38 @@ class Feedback extends WireData implements Module {
     }
 
     require_once($this->config->paths->{$this->className} . 'vendor/autoload.php');
+  }
+
+  /**
+   * Render Form
+   *
+   * @param array $options
+   * @param string $apiKey
+   * @return string
+   */
+  public function render($options = array(), $apiKey = null) {
+    $form = $this->buildAndProcessForm(null, $options);
+
+    if (!$form->getErrors() && $this->input->post->{self::SUBMIT}) {
+      $params = array();
+
+      foreach ($this->allFields as $af) {
+        $field = $this->fields->get($af);
+        $key = str_replace(self::TAG_NAME . '_', '', $af);
+        if ($this->input->post[$af]) $params[$key] = $this->input->post[$af];
+      }
+
+      if ($apiKeyOverride = $this->determineApiKey($params)) $apiKey = $apiKeyOverride;
+
+      if ($result = $this->sendFeedback($params, $apiKey)) {
+        $response = json_decode($result);
+        if ($response->success) return $this->_('We\'ll answer you soon!');
+      }
+
+      return $this->_('Something went wrong.');
+    } else {
+      return $form->render();
+    }
   }
 
   /**
@@ -158,6 +235,15 @@ class Feedback extends WireData implements Module {
     if ($this->apiData->email) $this->sendMail($pageId);
 
     return $this->setSuccessResponse();
+  }
+
+  /**
+   * Hookable method called before the form is processed
+   * Allows custom setting of apiKey
+   * For example depending on OptionField
+   */
+  protected function ___determineApiKey($params) {
+    return null;
   }
 
   /**
@@ -306,13 +392,38 @@ class Feedback extends WireData implements Module {
     return $isValid;
   }
 
+  private function setFormPresets(&$form, $options) {
+    $btnClass = isset($options['btnClass']) ? $options['btnClass'] : 'button';
+    $btnText = isset($options['btnText']) ? $options['btnText'] : 'Send';
+    $markup = isset($options['markup']) ? array_merge(self::$markup, $options['markup']) : self::$markup;
+    $classes = isset($options['classes']) ? array_merge(self::$classes, $options['classes']) : self::$classes;
+
+    // Form Rendering
+    $form->setMarkup($markup);
+    $form->setClasses($classes);
+
+    // add honeypot (spam protection)
+    $honeyField = $this->modules->get('InputfieldText');
+    $honeyField->name = 'feedback_website';
+    $honeyField->initValue = '';
+    $form->append($honeyField);
+
+    // add a submit button to the form
+    $submit = $this->modules->get('InputfieldSubmit');
+    $submit->name = self::SUBMIT;
+    $submit->attr('value', $btnText);
+    $submit->attr('class', $btnClass);
+    $form->append($submit);
+  }
+
   /**
    * Build and Process Form
    *
    * @param array $params
    * @return InputfieldForm
    */
-  private function buildAndProcessForm($params) {
+  private function buildAndProcessForm($params = array(), $options = array()) {
+    $processForm = false;
     $form = $this->modules->get('InputfieldForm');
     $form->method = 'post';
 
@@ -322,14 +433,30 @@ class Feedback extends WireData implements Module {
       $field = $this->fields->get($in);
       $inputfield = $field->getInputfield($this->page);
       $form->append($inputfield);
-      if (isset($params[$key])) $this->input->post[$in] = $params[$key];
+      if ($params && isset($params[$key])) $this->input->post[$in] = $params[$key];
     }
 
-    // add CSRF token
-    $this->input->post[$this->session->CSRF->getTokenName()] = $this->session->CSRF->getTokenValue();
+    // PROCESS Form via API
+    if ($params) {
+      // add CSRF token
+      $this->input->post[$this->session->CSRF->getTokenName()] = $this->session->CSRF->getTokenValue();
+      $processForm = true;
+    } else {
+      // Form Rendering
+      $this->setFormPresets($form, $options);
+    }
+
+    // on form submit
+    if ($this->input->post->{self::SUBMIT}) $processForm = true;
 
     // process input, send and validate form
-    $form->processInput($this->input->post);
+    if ($processForm) $form->processInput($this->input->post);
+
+    // test whether honeypot field has been filled
+    if ($processForm && $this->input->post->feedback_website) {
+      $honeypot = $form->get('feedback_website');
+      $honeypot->error($this->_('Sorry, but your message didn\'t pass our spam test. Please try another time.'));
+    }
 
     return $form;
   }

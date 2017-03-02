@@ -203,6 +203,8 @@ X-Powered-By: ProcessWire CMS
 
 ## Testing
 
+**[behat](http://behat.org/)**: A php framework for autotesting your business expectations.
+
 First you've to install the required composer packages:
 
 ```
@@ -239,10 +241,10 @@ $ vendor/bin/behat --suite=hashed --tags "~@success"
 As you see tag filters supports different logical operators:
 
 1. **AND**: separation by `&&`
-2. *OR**: separation by `comma`
-3. *NOT*: prefixing a `~`
+2. **OR**: separation by `comma`
+3. **NOT**: prefixing a `~`
 
-Or for example you can run a scenario by using part of the name:
+Or for example you can run a scenario by using a part of the name:
 
 ```
 $ vendor/bin/behat --suite=hashed --name 'Send feedback'
