@@ -73,6 +73,15 @@ The session variable **feedbackstatus** can be used to add additional content fo
 
 To get an overview of what's possible, have a look at [How to overwrite classes and markup][1]
 
+
+#### Spam Protection: Hide honeypot field using CSS
+
+Spam bots fill in automatically all form fields. By adding an invisible field you're able to trick the bots. The key to the honeypot technique is that the form only can be sent when the honeypot field remains empty otherwise it will be treated as spam.
+
+The honeypot technique doesn't interfere with the user experience. It demands nothing extra of them like a captcha does. In fact, user won't even notice you're using it.
+
+All that's required is a visually hidden form field. This form adds such a field named `scf-website` by default but you have to make sure to add a **display: none;** CSS rule on it.
+
 ### Sending Feedback
 
 ```php
