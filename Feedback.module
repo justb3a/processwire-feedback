@@ -15,7 +15,7 @@ use PhilipBrown\Signature\Exceptions\SignatureException;
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.1.1
+* @version 0.1.2
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -35,7 +35,7 @@ class Feedback extends WireData implements Module {
     return array(
       'title' => 'Feedback',
       'summary' => 'Send and save feedack via json and display it (backend).',
-      'version' => 011,
+      'version' => 012,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -123,6 +123,7 @@ class Feedback extends WireData implements Module {
   public function ready() {
     $this->addHookBefore('Modules::saveModuleConfigData', $this, 'addFields');
     $this->apiData = (object) self::$apiDataDefaults;
+    $this->session->feedbackstatus = 'init';
 
     // only include script on module edit page
     if ($this->page->path === '/delta/module/' && $this->input->name === $this->className) {
@@ -142,11 +143,14 @@ class Feedback extends WireData implements Module {
   public function render($options = array(), $apiKey = null) {
     $form = $this->buildAndProcessForm(null, $options);
 
+    if ($form->getErrors()) $this->session->feedbackstatus = 'error';
+
     if (!$form->getErrors() && $this->input->post->{self::SUBMIT}) {
       $params = array();
 
       foreach ($this->allFields as $af) {
         $field = $this->fields->get($af);
+        if ($field->type instanceof FieldtypeFieldsetOpen || $field->type instanceof FieldtypeFieldsetClose) continue;
         $key = str_replace(self::TAG_NAME . '_', '', $af);
         if ($this->input->post[$af]) $params[$key] = $this->input->post[$af];
       }
@@ -155,7 +159,10 @@ class Feedback extends WireData implements Module {
 
       if ($result = $this->sendFeedback($params, $apiKey)) {
         $response = json_decode($result);
-        if ($response->success) return $this->_('We\'ll answer you soon!');
+        if ($response->success) {
+          $this->session->feedbackstatus = 'success';
+          return '<div class="feedback-success">' . $this->_('We\'ll answer you soon!') . '</div>';
+        }
       }
 
       return $this->_('Something went wrong.');
@@ -299,6 +306,7 @@ class Feedback extends WireData implements Module {
 
     foreach ($this->allFields as $af) {
       $field = $this->fields->get($af);
+      if ($field->type instanceof FieldtypeFieldsetOpen || $field->type instanceof FieldtypeFieldsetClose) continue;
       $value = $field->type instanceof FieldtypeOptions ? $p->$af->title : $p->$af;
       $msg[] = $field->label . ': ' . $value;
     }

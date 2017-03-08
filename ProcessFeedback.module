@@ -6,7 +6,7 @@
 * See README.md for usage instructions.
 *
 * @author Tabea David <info@justonestep.de>
-* @version 0.1.1
+* @version 0.1.2
 * @copyright Copyright (c) 2017
 * @see https://github.com/justonestep/processwire-feedback
 * @see http://www.processwire.com
@@ -26,7 +26,7 @@ class ProcessFeedback extends Process implements Module {
     return array(
       'title' => 'ProcessFeedback',
       'summary' => 'Displays saved feedback (backend).',
-      'version' => 011,
+      'version' => 012,
       'href' => 'https://github.com/justonestep/processwire-feedback',
       'singular' => true,
       'autoload' => true,
@@ -79,6 +79,7 @@ class ProcessFeedback extends Process implements Module {
 
     foreach ($this->configData->allFields as $f) {
       $field = $this->fields->get($f);
+      if ($this->skipFieldtype($field->type)) continue;
       $label = $field->label;
       $body = $field->type instanceof FieldtypeOptions ? $entry->$f->title : nl2br($entry->$f);
 
@@ -109,7 +110,7 @@ class ProcessFeedback extends Process implements Module {
     $headerRow = array('view', $this->_('Date'));
     foreach ($this->configData->allFields as $f) {
       $field = $this->fields->get($f);
-      if ($field->type instanceof FieldtypeTextarea) continue;
+      if ($this->skipFieldtype($field->type, array('FieldtypeTextarea'))) continue;
       $headerRow[] = $field->label;
     }
     $table->headerRow($headerRow);
@@ -125,7 +126,7 @@ class ProcessFeedback extends Process implements Module {
       $tableRow = array($link, date("d.m.Y, g:i a", $entry->created));
       foreach ($this->configData->allFields as $f) {
         $field = $this->fields->get($f);
-        if ($field->type instanceof FieldtypeTextarea) continue;
+        if ($this->skipFieldtype($field->type, array('FieldtypeTextarea'))) continue;
         $tableRow[] = $field->type instanceof FieldtypeOptions ? $entry->$f->title : $entry->$f;
       }
 
@@ -133,6 +134,30 @@ class ProcessFeedback extends Process implements Module {
     }
 
     return $table->render() . $entries->renderPager();
+  }
+
+  /**
+   * Skip some fieldtypes
+   *
+   * @param obj $type
+   * @param array extend
+   * @return boolean
+   */
+  private function skipFieldtype($type, $extend = array()) {
+    $skip = false;
+    $skipTypes = array_merge(array(
+      'FieldtypeFieldsetOpen',
+      'FieldtypeFieldsetClose'
+    ), $extend);
+
+    foreach ($skipTypes as $st) {
+      if ((string)$type === $st) {
+        $skip = true;
+        break;
+      }
+    }
+
+    return $skip;
   }
 
   /**

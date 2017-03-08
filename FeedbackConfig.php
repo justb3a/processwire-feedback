@@ -17,6 +17,7 @@ class FeedbackConfig extends ModuleConfig {
       'addFields' => '',
       'saveMessagesParent' => false,
       'saveMessagesScheme' => '',
+      'emailfrom' => '',
       'api' => '[{"name":"","key":"","secret":"","email":""}]'
     );
   }

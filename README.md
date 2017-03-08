@@ -35,10 +35,43 @@ Assign the created page as parent.
 Edit the template of the page you’ve selected as parent page. 
 
 ```php
+echo $modules->get('Feedback')->render(); // OR
 echo $modules->get('Feedback')->saveFeedback(); 
 ```
 
 It’s important that this template includes *”only”* the line above.
+
+### Render Form
+
+```php
+$options = array(
+  'btnText' => 'Let me fly',
+  'btnClass' => 'button',
+  'classes' => array(
+    'item' => 'form-item  form-item__{name}'
+  )
+));
+
+$key = 'optionalKey'; // if empty the first one from module settings will be taken
+
+echo $modules->get('Feedback')->render($options, $key); 
+
+echo '<div class="feedback-status--' . $this->session->feedbackstatus . '"></div>';
+```
+
+The session variable **feedbackstatus** can be used to add additional content for different states.  
+`$this->session->feedbackstatus` equals either `init`, `error` or `success`.
+
+#### Available Keys
+
+| key                | type    | description                                                |
+| ---                | ----    | -----------                                                |
+| btnClass           | string  | add custom submit button class(es)                         |
+| btnText            | string  | add custom submit button text, defaults to `Send`          |
+| markup             | array   | overwrite markup                                           |
+| classes            | array   | overwrite classes                                          |
+
+To get an overview of what's possible, have a look at [How to overwrite classes and markup][1]
 
 ### Sending Feedback
 
@@ -250,3 +283,5 @@ Or for example you can run a scenario by using a part of the name:
 $ vendor/bin/behat --suite=hashed --name 'Send feedback'
 $ vendor/bin/behat --suite=hashed --name 'Unsuccessfull api request'
 ```
+
+[1]: https://github.com/justb3a/processwire-simplecontactform/blob/master/doc/overwrite-classes-and-markup.md 'How to overwrite classes and markup'
