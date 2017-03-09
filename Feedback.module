@@ -167,6 +167,7 @@ class Feedback extends WireData implements Module {
 
       return $this->_('Something went wrong.');
     } else {
+      $this->addFormPresets($form);
       return $form->render();
     }
   }
@@ -252,6 +253,12 @@ class Feedback extends WireData implements Module {
   protected function ___determineApiKey($params) {
     return null;
   }
+
+  /**
+   * Hookable method called before the form is rendered
+   * Allows custom settings
+   */
+  protected function ___addFormPresets($form) { }
 
   /**
    * Get Api Data
