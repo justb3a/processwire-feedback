@@ -65,7 +65,7 @@ hash_hmac(
 )
 ```
 
-**= $signature**
+**`= $signature`**
 
 ### 4. Merge params and send request
 
