@@ -73,7 +73,6 @@ The session variable **feedbackstatus** can be used to add additional content fo
 
 To get an overview of what's possible, have a look at [How to overwrite classes and markup][1]
 
-
 #### Spam Protection: Hide honeypot field using CSS
 
 Spam bots fill in automatically all form fields. By adding an invisible field you're able to trick the bots. The key to the honeypot technique is that the form only can be sent when the honeypot field remains empty otherwise it will be treated as spam.
@@ -126,171 +125,16 @@ By default, the response will take the following form:
 {"success":true}
 ```
 
-### Common Errors
+## Read more
 
-There are an additional set of errors that can occur. The following examples show JSON responses.
-
-#### Incorrect client credentials
-
-If the apiUser or apiKey you pass are incorrect you will receive this error response.
-
-**Status Code**: 401 Unauthorized
-
-```
-{  
-  "success":false, 
-  "error": "incorrect_client_credentials", 
-  "error_description":"Authorization failed."
-}
-```
-
-#### Incorrect request method
-
-If the request method does not equal **`POST`** you will receive this error response.
-
-**Status Code**: 400 Bad Request
-
-```
-{  
-  "success":false, 
-  "error": "incorrect_request_method", 
-  "error_description":"Incorrect request method."
-}
-```
-
-#### Incorrect content type
-
-If the content type does not match **`application/json`** you will receive the following error response.
-
-**Status Code**: 400 Bad Request
-
-```
-{  
-  "success":false, 
-  "error":"incorrect_content_type",
-  "error_description":"Incorrect content type."
-}
-```
-
-#### No params have been passed
-
-If the request does not contain any parameters the response looks like the following:
-
-**Status Code**: 400 Bad Request
-
-```
-{  
-  "success":false, 
-  "error":"missing_parameters",
-  "error_description":"Parameters are missing."
-}
-```
-
-#### Feedback could not be saved
-
-If the feedback could not be saved you will receive this error message:
-
-**Status Code**: 503 Service Unavailable
-
-```
-{  
-  "success":false, 
-  "error":"error_saving_request",
-  "error_description":"Page could not be successfully created."
-}
-```
-
-#### Validation Error
-
-If the parameters does not pass the validation you get the following error response:
-
-**Status Code**: 400 Bad Request
-
-```
-{  
-  "success":false, 
-  "error":"validation_error",
-  "error_description":"Validation error.",
-  "errors":
-    {
-      "email":"Please enter a valid e-mail address",
-      "subject":"Missing required value"
-    }
-}
-```
-
-### Example using curl [Basic HTTP Authentication]
-
-```
-curl -i -H "Content-Type: application/json" --user myuser:12345 -X POST -d '{"field1":"2","field2":"test","field3":"xyz@foo.de","field4":"It Works :)"}' https://api.url/endpoint/
-```
-
-Response
-
-```
-HTTP/1.1 201 Created
-Server: nginx/1.11.3
-Date: Wed, 22 Feb 2017 10:46:08 GMT
-Content-Type: application/json
-Transfer-Encoding: chunked
-Connection: keep-alive
-Set-Cookie: wire=le6grhc6htrii3t8k5cb8capt5; path=/; HttpOnly
-Expires: Thu, 19 Nov 1981 08:52:00 GMT
-Cache-Control: no-store, no-cache, must-revalidate
-Pragma: no-cache
-X-Powered-By: ProcessWire CMS
-
-{"success":true}
-```
-
-## Testing
-
-**[behat](http://behat.org/)**: A php framework for autotesting your business expectations.
-
-First you've to install the required composer packages:
-
-```
-composer install
-```
-
-Then copy `behat.yml.example` and rename it to `behat.yml`.  
-Now edit the copied file and replace everything below `AuthenticationContext`:
-
-1. the baseurl containing `http[s]`
-2. valid apiKey
-3. valid apiSecret
-4. json including all needed parameters including valid values
-
-If you're using **Basic HTTP Authentication** use test suite **basichttp**, otherwise use **hashed**.
-
-Now you should be able to execute the following command:
-
-```
-$ vendor/bin/behat --suite=basichttp
-$ vendor/bin/behat --suite=hashed
-```
-
-You can also run behat scenarios using tag filters:
-
-```
-$ vendor/bin/behat --suite=hashed --tags @send
-$ vendor/bin/behat --suite=hashed --tags @receive
-$ vendor/bin/behat --suite=hashed --tags "@send&&@success"
-$ vendor/bin/behat --suite=hashed --tags "@send,@success"
-$ vendor/bin/behat --suite=hashed --tags "~@success"
-```
-
-As you see tag filters supports different logical operators:
-
-1. **AND**: separation by `&&`
-2. **OR**: separation by `comma`
-3. **NOT**: prefixing a `~`
-
-Or for example you can run a scenario by using a part of the name:
-
-```
-$ vendor/bin/behat --suite=hashed --name 'Send feedback'
-$ vendor/bin/behat --suite=hashed --name 'Unsuccessfull api request'
-```
+- [Common Errors][2]
+- [Testing][3]
+- [HTTP Basic Authentication][4]
+- [Key/Secret using hashed signatures Authentication][5]
 
 [1]: https://github.com/justb3a/processwire-simplecontactform/blob/master/doc/overwrite-classes-and-markup.md 'How to overwrite classes and markup'
+[2]: doc/errors.md      "Common Errors"
+[3]: doc/testing.md     "Testing"
+[4]: doc/httpauth.md    "HTTP Basic Authentication"
+[5]: doc/hashedauth.md  "Key/Secret using hashed signatures Authentication"
+
