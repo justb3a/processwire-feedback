@@ -89,5 +89,5 @@ Merge auth params, hashed signature and request params.
 Send it via POST.
 
 ```
-$http->post($path, json_encode($queryParams));
+$http->post($endpoint, json_encode($queryParams));
 ```
