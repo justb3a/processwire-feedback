@@ -10,7 +10,7 @@ HMAC-SHA authentication allows you to implement very simple key / secret authent
 - **endpoint**: https://api.url/endpoint/
 - **auth params**: auth_key, auth_timestamp, auth_version = “5.1.2”
 - **request params**: fields e.g. email, message, name, subject
-- **auth_secret**
+- **auth secret**: **`= $authSecret`**
 
 **Steps:**
 
@@ -61,7 +61,7 @@ Generate a keyed hash value using the HMAC method. Used hashing algorithm: **sha
 hash_hmac(
   'sha256',
   $payload,
-  $secret
+  $authSecret
 )
 ```
 
